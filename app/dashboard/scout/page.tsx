@@ -41,11 +41,21 @@ export default function ScoutDashboard() {
   // Authenticated Scout Cache
   const [scoutId, setScoutId] = useState<string | null>(null);
   const [scoutName, setScoutName] = useState("Platform Scout");
+  const [academyName, setAcademyName] = useState("PlayedIn Talent Engine");
 
-  // Functional Messaging States
+  // Interaction Channels
+  const [activeOutreachMode, setActiveOutreachMode] = useState<"chat" | "call" | null>(null);
   const [directMessageText, setDirectMessageText] = useState("");
   const [sendingDm, setSendingDm] = useState(false);
-  const [dmStatus, setDmStatus] = useState("");
+  
+  // Trial Fields
+  const [trialLocation, setTrialLocation] = useState("");
+  const [trialDate, setTrialDate] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+  const [trialNotes, setTrialNotes] = useState("");
+  const [sendingTrial, setSendingTrial] = useState(false);
+
+  const [feedbackStatus, setFeedbackStatus] = useState("");
 
   useEffect(() => {
     const fetchScoutMatrix = async () => {
@@ -60,7 +70,10 @@ export default function ScoutDashboard() {
           .eq("id", session.user.id)
           .single();
 
-        if (scoutProfile?.name) setScoutName(scoutProfile.name);
+        if (scoutProfile?.name) {
+          setScoutName(scoutProfile.name);
+          setAcademyName(`${scoutProfile.name.split(" ")[0]}'s Talent Agency`);
+        }
       }
       
       const { data, error } = await supabase
@@ -97,13 +110,13 @@ export default function ScoutDashboard() {
     fetchScoutMatrix();
   }, []);
 
-  // REAL FUNCTIONAL DM DISPATCHER
+  // COMMIT CHAT MESSAGE
   const handleSendDirectMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedModalAthlete || !scoutId || !directMessageText.trim()) return;
     
     setSendingDm(true);
-    setDmStatus("");
+    setFeedbackStatus("");
 
     try {
       const { error } = await supabase
@@ -119,14 +132,52 @@ export default function ScoutDashboard() {
 
       if (error) throw error;
 
-      setDmStatus("success");
+      setFeedbackStatus("Message securely dropped to athlete's dashboard inbox!");
       setDirectMessageText("");
-      setTimeout(() => setDmStatus(""), 3000);
+      setTimeout(() => setFeedbackStatus(""), 3000);
     } catch (err: any) {
       console.error("DM dispatch error:", err);
-      setDmStatus("error");
+      setFeedbackStatus("Error transmitting ping payload.");
     } finally {
       setSendingDm(false);
+    }
+  };
+
+  // COMMIT TRIAL INVITE
+  const handleSendTrialRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedModalAthlete || !scoutId) return;
+    
+    setSendingTrial(true);
+    setFeedbackStatus("");
+
+    try {
+      const { error } = await supabase
+        .from("trial_invitations")
+        .insert([
+          {
+            scout_id: scoutId,
+            scout_name: scoutName,
+            academy_name: academyName,
+            athlete_id: selectedModalAthlete.id,
+            athlete_name: selectedModalAthlete.name || "Athlete",
+            trial_date: trialDate,
+            trial_location: trialLocation,
+            contact_info: contactInfo,
+            notes: trialNotes.trim() !== "" ? trialNotes : "Scout physical performance query evaluation."
+          }
+        ]);
+
+      if (error) throw error;
+
+      setFeedbackStatus("Trial call request seamlessly pushed to player portal!");
+      setTrialLocation(""); setTrialDate(""); setContactInfo(""); setTrialNotes("");
+      setTimeout(() => setFeedbackStatus(""), 3000);
+    } catch (err: any) {
+      console.error("Trial mapping execution failure:", err);
+      setFeedbackStatus("Error committing trial setup parameter.");
+    } finally {
+      setSendingTrial(false);
     }
   };
 
@@ -157,7 +208,7 @@ export default function ScoutDashboard() {
         <div className="bg-[#0c1419] border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-teal-400" />
           <h1 className="text-xl font-bold text-white">Discover Grassroots Stars</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Click any athlete card to access their documentation ledger and drop immediate secure messages</p>
+          <p className="text-xs text-slate-400 mt-0.5">Click any athlete card to access their documentation ledger and trigger dynamic physical trials</p>
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
             <div className="md:col-span-8 relative">
@@ -185,7 +236,7 @@ export default function ScoutDashboard() {
               {filteredAthletes.map((athlete) => {
                 const isHovered = hoveredAthleteId === athlete.id;
                 return (
-                  <div key={athlete.id} onMouseEnter={() => setHoveredAthleteId(athlete.id)} onMouseLeave={() => setHoveredAthleteId(null)} onClick={() => setSelectedModalAthlete(athlete)} className="bg-[#0c1419] border border-slate-800 rounded-2xl p-5 flex flex-col justify-between relative transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 cursor-pointer group">
+                  <div key={athlete.id} onMouseEnter={() => setHoveredAthleteId(athlete.id)} onMouseLeave={() => setHoveredAthleteId(null)} onClick={() => { setSelectedModalAthlete(athlete); setActiveOutreachMode(null); setFeedbackStatus(""); }} className="bg-[#0c1419] border border-slate-800 rounded-2xl p-5 flex flex-col justify-between relative transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 cursor-pointer group">
                     <div>
                       <div className="flex justify-between items-start">
                         <span className="text-[10px] font-bold text-slate-500 uppercase block">{athlete.sport}</span>
@@ -206,7 +257,7 @@ export default function ScoutDashboard() {
                       {isHovered && (
                         <div className="mt-3 pt-3 border-t border-blue-500/20 space-y-2 animate-in fade-in duration-200">
                           <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-3 italic">"{athlete.bio}"</p>
-                          <span className="text-blue-400 font-bold underline text-[10px] block text-right">Deep Dive & Chat →</span>
+                          <span className="text-blue-400 font-bold underline text-[10px] block text-right">Deep Dive & Outreach →</span>
                         </div>
                       )}
                     </div>
@@ -218,7 +269,7 @@ export default function ScoutDashboard() {
         </div>
       </div>
 
-      {/* FULLY FUNCTIONAL PROFILE & CHAT MODAL */}
+      {/* FULLY FUNCTIONAL PROFILE DEEP-DIVE MODAL EQUIPPED WITH TAB CHAT/CALL ACTIONS */}
       {selectedModalAthlete && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#0c1419] border border-slate-800 w-full max-w-4xl rounded-3xl relative shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
@@ -240,36 +291,86 @@ export default function ScoutDashboard() {
 
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
               
-              {/* INTERACTIVE SECURE DIRECT MESSAGING WORKSPACE */}
-              <div className="bg-[#080d10] border-2 border-emerald-500/30 rounded-2xl p-5 space-y-3 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500/50" />
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Direct Connect Channel</h3>
+              {/* PRIMARY INTERACTIVE OUTREACH ROUTER */}
+              <div className="bg-[#080d10] border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800/80 pb-3">
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-blue-400 block tracking-wider">Scouting Hub Operations</span>
+                    <h3 className="text-xs font-bold text-white mt-0.5">Select Dispatch Path</h3>
                   </div>
-                  
-                  {/* DIRECT EMAIL LAUNCHER HOOK */}
-                  <a href={`mailto:${selectedModalAthlete.email}?subject=Scouting Inquiry from PlayedIn Platform`} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer">
-                    <Mail className="w-3.5 h-3.5" /> Launch Email App
-                  </a>
+
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <button onClick={() => { setActiveOutreachMode("chat"); setFeedbackStatus(""); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer flex-1 sm:flex-initial justify-center ${activeOutreachMode === "chat" ? "bg-emerald-500 text-black" : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"}`}>
+                      <MessageSquare className="w-3.5 h-3.5" /> Instant Chat Drop
+                    </button>
+                    <button onClick={() => { setActiveOutreachMode("call"); setFeedbackStatus(""); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer flex-1 sm:flex-initial justify-center ${activeOutreachMode === "call" ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"}`}>
+                      <Phone className="w-3.5 h-3.5" /> Physical Trial Call
+                    </button>
+                    <a href={`mailto:${selectedModalAthlete.email}?subject=Scouting Inquiry from PlayedIn Platform`} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer justify-center">
+                      <Mail className="w-3.5 h-3.5" /> Email
+                    </a>
+                  </div>
                 </div>
 
-                <form onSubmit={handleSendDirectMessage} className="space-y-2 pt-1">
-                  <textarea rows={2} required placeholder={`Type instant direct message to ${selectedModalAthlete.name}... (e.g. "Loved your footwork reel. Let's schedule a call.")`} value={directMessageText} onChange={(e) => setDirectMessageText(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none placeholder-slate-600" />
-                  
-                  <div className="flex justify-between items-center pt-1">
-                    <div>
-                      {dmStatus === "success" && <span className="text-xs font-bold text-emerald-400 flex items-center gap-1"><Check className="w-3.5 h-3.5 stroke-[3]" /> Message securely dropped to athlete's dashboard inbox!</span>}
-                      {dmStatus === "error" && <span className="text-xs text-red-400">Failed dispatching payload.</span>}
+                {/* STATUS BAR */}
+                {feedbackStatus && (
+                  <div className={`p-3 rounded-xl text-xs font-bold border flex items-center gap-1.5 ${feedbackStatus.includes("Error") ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"}`}>
+                    <Check className="w-3.5 h-3.5 stroke-[3]" /> {feedbackStatus}
+                  </div>
+                )}
+
+                {/* FORM 1: CHAT PING */}
+                {activeOutreachMode === "chat" && (
+                  <form onSubmit={handleSendDirectMessage} className="space-y-2.5 animate-in fade-in duration-200">
+                    <textarea rows={2} required placeholder={`Type direct ping payload to ${selectedModalAthlete.name}...`} value={directMessageText} onChange={(e) => setDirectMessageText(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none placeholder-slate-600" />
+                    <button type="submit" disabled={sendingDm} className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                      {sendingDm ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Transmit Secure Message Payload <Send className="w-3 h-3 stroke-[2.5]" /></>}
+                    </button>
+                  </form>
+                )}
+
+                {/* FORM 2: TRIAL INVITATION SETTINGS */}
+                {activeOutreachMode === "call" && (
+                  <form onSubmit={handleSendTrialRequest} className="space-y-3 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Meetup Ground Location</label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-600" />
+                          <input type="text" required placeholder="e.g. AstroTurf Arena, Gate 2" value={trialLocation} onChange={(e) => setTrialLocation(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Target Date & Time</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-600" />
+                          <input type="text" required placeholder="e.g. Saturday, 16th May @ 8 AM" value={trialDate} onChange={(e) => setTrialDate(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+                        </div>
+                      </div>
                     </div>
 
-                    <button type="submit" disabled={sendingDm} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                      {sendingDm ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Drop Secure Message <Send className="w-3 h-3 stroke-[2.5]" /></>}
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Recruiter Secure Conduit (Phone / Email)</label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-600" />
+                        <input type="text" required placeholder="e.g. +91 98765 43210" value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-mono" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Assessment Notes</label>
+                      <textarea rows={2} placeholder="Detail gear setups..." value={trialNotes} onChange={(e) => setTrialNotes(e.target.value)} className="w-full bg-[#0c1419] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 resize-none" />
+                    </div>
+
+                    <button type="submit" disabled={sendingTrial} className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-lg shadow-blue-500/10">
+                      {sendingTrial ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Deploy Trial Call-Up Setup <Check className="w-3 h-3 stroke-[3]" /></>}
                     </button>
-                  </div>
-                </form>
+                  </form>
+                )}
+
+                {!activeOutreachMode && (
+                  <p className="text-xs text-slate-500 italic text-center py-2">Select a dispatch pathway above to load communication terminals.</p>
+                )}
               </div>
 
               {/* Verified Documents Ledger Stack */}

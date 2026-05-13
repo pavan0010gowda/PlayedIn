@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   MapPin, Users, CheckCircle, Award, Loader2, PlusCircle, 
-  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar, MessageSquare
+  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar, MessageSquare, Trophy
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -295,6 +295,12 @@ export default function AthleteDashboard() {
 
             {/* DYNAMIC ACTION TRIGGER SET (WITH INTEGRATED COMMUNITY HUB HOOK) */}
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end">
+              <button 
+                onClick={() => window.location.href = "/tournaments"}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-400 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-800 cursor-pointer"
+              >
+                <Trophy className="w-3.5 h-3.5 text-blue-400" /> Tournaments
+              </button>
               <button 
                 onClick={() => window.location.href = "/communities"}
                 className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-800 cursor-pointer"
