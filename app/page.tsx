@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Trophy, User, Compass, Calendar, ArrowRight, CheckCircle2, Shield, Lock, Loader2 } from "lucide-react";
+import { Trophy, User, Compass, Calendar, ArrowRight, Shield, Lock, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -70,7 +70,8 @@ export default function LoginPage() {
       .single();
 
     if (data?.ecosystem_role) {
-      router.push(`/dashboard/${data.ecosystem_role}`);
+      // CRITICAL UPGRADE: Route directly to the Unified Platform Home Hub
+      router.push("/home");
     } else {
       setNeedsOnboarding(true);
     }
@@ -130,7 +131,9 @@ export default function LoginPage() {
         ]);
 
       if (error) throw error;
-      router.push(`/dashboard/${selectedRole}`);
+      
+      // Route newly onboarded profiles straight to the common homepage
+      router.push("/home");
     } catch (error: any) {
       setErrorMessage("Could not finalize your identity profile. Please attempt submission again.");
       setLoading(false);
