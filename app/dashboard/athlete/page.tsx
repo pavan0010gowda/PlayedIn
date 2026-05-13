@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   MapPin, Users, CheckCircle, Award, Loader2, PlusCircle, 
-  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar
+  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar, MessageSquare
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -38,12 +38,20 @@ interface TrialInvite {
   created_at: string;
 }
 
+interface DirectMessage {
+  id: string;
+  sender_name: string;
+  message: string;
+  created_at: string;
+}
+
 export default function AthleteDashboard() {
   const [activeTab, setActiveTab] = useState("credentials");
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(true);
   
+  // Custom Metadata States
   const [profileName, setProfileName] = useState("");
   const [initials, setInitials] = useState("AS");
   const [age, setAge] = useState("20");
@@ -51,14 +59,18 @@ export default function AthleteDashboard() {
   const [prefSide, setPrefSide] = useState("Right");
   const [aboutMe, setAboutMe] = useState("");
 
+  // Integrated Database Arrays
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [userReels, setUserReels] = useState<UserReel[]>([]);
   const [trialInvites, setTrialInvites] = useState<TrialInvite[]>([]);
+  const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
+  // Modal Controllers
   const [isCredModalOpen, setIsCredModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
+  // Form State Properties
   const [newTitle, setNewTitle] = useState("");
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgLink, setNewOrgLink] = useState("");
@@ -71,6 +83,7 @@ export default function AthleteDashboard() {
   const [modalError, setModalError] = useState("");
   const [savingMetrics, setSavingMetrics] = useState(false);
 
+  // Initialize profile contexts and bind concurrent data arrays
   useEffect(() => {
     const initializeEcosystemView = async () => {
       setLoadingProfile(true);
@@ -106,23 +119,26 @@ export default function AthleteDashboard() {
     initializeEcosystemView();
   }, []);
 
+  // Secure parallel extraction for 4 separate data dependencies
   const fetchIntegratedMatrix = async (targetId: string) => {
     setLoadingAssets(true);
     
-    // FETCH 3 PIPELINES SIMULTANEOUSLY: Posts, Reels, AND Physical Scout Call-Ups
-    const [achRes, reelsRes, invitesRes] = await Promise.all([
+    const [achRes, reelsRes, invitesRes, messagesRes] = await Promise.all([
       supabase.from("achievements").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false }),
       supabase.from("reels").select("id, video_url, caption, likes_count").eq("athlete_id", targetId).order("created_at", { ascending: false }),
-      supabase.from("trial_invitations").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false })
+      supabase.from("trial_invitations").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false }),
+      supabase.from("direct_messages").select("*").eq("receiver_id", targetId).order("created_at", { ascending: false })
     ]);
 
     if (achRes.data) setAchievements(achRes.data);
     if (reelsRes.data) setUserReels(reelsRes.data);
     if (invitesRes.data) setTrialInvites(invitesRes.data);
+    if (messagesRes.data) setInboxMessages(messagesRes.data);
     
     setLoadingAssets(false);
   };
 
+  // Dispatch raw binary files directly to Supabase global documents pool
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!e.target.files || e.target.files.length === 0 || !userId) return;
@@ -150,6 +166,7 @@ export default function AthleteDashboard() {
     }
   };
 
+  // Commit dynamic documented posts complete with descriptive layers
   const handleCommitCredential = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
@@ -189,6 +206,7 @@ export default function AthleteDashboard() {
     }
   };
 
+  // Apply metric parameter changes securely to the cloud profiles table
   const handleSaveMetrics = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
@@ -208,7 +226,7 @@ export default function AthleteDashboard() {
     }
   };
 
-  // Allow athletes to lock in meeting pings dynamically
+  // Dynamically set scout trial invite states
   const handleAcknowledgeInvite = async (inviteId: string) => {
     try {
       const { error } = await supabase
@@ -240,6 +258,7 @@ export default function AthleteDashboard() {
         </div>
       </header>
 
+      {/* Hero Workspace Frame */}
       <div className="max-w-7xl mx-auto px-6 pt-8">
         <div className="bg-[#0c1419] border border-slate-800/80 rounded-3xl p-6 sm:p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
@@ -274,7 +293,14 @@ export default function AthleteDashboard() {
               </div>
             </div>
 
+            {/* DYNAMIC ACTION TRIGGER SET (WITH INTEGRATED COMMUNITY HUB HOOK) */}
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end">
+              <button 
+                onClick={() => window.location.href = "/communities"}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-800 cursor-pointer"
+              >
+                <Users className="w-3.5 h-3.5 text-emerald-400" /> Community Hub
+              </button>
               <button 
                 onClick={() => setIsEditModalOpen(true)}
                 className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer"
@@ -292,9 +318,10 @@ export default function AthleteDashboard() {
         </div>
       </div>
 
+      {/* Main Framework Grid Architecture */}
       <div className="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* LEFT WORKSPACE CONTAINERS */}
+        {/* LEFT PRIMARY MATRIX WORKSPACE */}
         <div className="lg:col-span-8 space-y-6">
           <div className="flex items-center gap-1.5 border-b border-slate-800 pb-px overflow-x-auto">
             <button onClick={() => setActiveTab("credentials")} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "credentials" ? "text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5" : "text-slate-400 hover:text-slate-200"}`}>
@@ -312,6 +339,7 @@ export default function AthleteDashboard() {
             </button>
           </div>
 
+          {/* TAB 1: VERIFIED POSTS LAYOUT */}
           {activeTab === "credentials" && (
             <div className="space-y-4">
               {loadingAssets ? (
@@ -357,6 +385,7 @@ export default function AthleteDashboard() {
             </div>
           )}
 
+          {/* TAB 2: PERSONAL VIDEO LOOPS */}
           {activeTab === "reels" && (
             <div className="space-y-4">
               {loadingAssets ? (
@@ -375,6 +404,7 @@ export default function AthleteDashboard() {
             </div>
           )}
 
+          {/* TAB 3: EXTENDED METRICS BIO */}
           {activeTab === "about" && (
             <div className="space-y-4">
               <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-6 space-y-3">
@@ -385,17 +415,54 @@ export default function AthleteDashboard() {
           )}
         </div>
 
-        {/* RIGHT COLUMN: CORE SECURITY CHECKLIST & DYNAMIC RECRUITMENT CALL-UPS */}
+        {/* RIGHT SIDEBAR MODULES: HIGH VISIBILITY DIRECT MESSAGES & CALL-UP MATRIX */}
         <div className="lg:col-span-4 space-y-6">
           
-          {/* SECURE SCOUTING PINGS & PHYSICAL TRIAL COMMAND VIEW MODULE */}
+          {/* DIRECT MESSAGING CHAT BOX PIPELINE VIEW */}
+          <div className="bg-[#0c1419] border-2 border-emerald-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider block">Recruitment Network</span>
+                <h3 className="text-sm font-bold text-white mt-0.5">Secure Direct Inbox</h3>
+              </div>
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                {inboxMessages.length} DMs
+              </span>
+            </div>
+
+            {loadingAssets ? (
+              <div className="py-8 text-center text-xs text-slate-500"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-emerald-400" /> Caching DMs...</div>
+            ) : inboxMessages.length === 0 ? (
+              <div className="py-8 text-center border border-slate-800/80 rounded-xl bg-[#080d10]">
+                <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-1 stroke-[1.5]" />
+                <p className="text-xs font-bold text-slate-400">Inbox is Clear</p>
+                <p className="text-[10px] text-slate-500 max-w-[200px] mx-auto mt-0.5">Direct scout outreach chat notifications surface here instantaneously.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                {inboxMessages.map((msg) => (
+                  <div key={msg.id} className="p-3 bg-[#080d10] border border-slate-800 rounded-xl space-y-1.5">
+                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
+                      <span className="text-xs font-bold text-emerald-400 capitalize">{msg.sender_name}</span>
+                      <span className="text-[9px] text-slate-500 font-mono">Just now</span>
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap break-words">{msg.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PHYSICAL MEETUP INVITATION MODULE */}
           <div className="bg-[#0c1419] border-2 border-blue-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-teal-400" />
             
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[9px] uppercase font-bold text-blue-400 tracking-wider block">Recruitment Matrix</span>
-                <h3 className="text-sm font-bold text-white mt-0.5">Scout Call-Ups & Invites</h3>
+                <span className="text-[9px] uppercase font-bold text-blue-400 tracking-wider block">Trial Router</span>
+                <h3 className="text-sm font-bold text-white mt-0.5">Scout Call-Ups</h3>
               </div>
               <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 font-mono">
                 {trialInvites.length} Pings
@@ -403,31 +470,29 @@ export default function AthleteDashboard() {
             </div>
 
             {loadingAssets ? (
-              <div className="py-8 text-center text-xs text-slate-500"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-blue-400" /> Indexing Secure Conduits...</div>
+              <div className="py-8 text-center text-xs text-slate-500"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-blue-400" /> Indexing Conduits...</div>
             ) : trialInvites.length === 0 ? (
               <div className="py-8 text-center border border-slate-800/80 rounded-xl bg-[#080d10]">
                 <Phone className="w-8 h-8 text-slate-700 mx-auto mb-1 stroke-[1.5]" />
-                <p className="text-xs font-bold text-slate-400">No Open Meetup Invites</p>
-                <p className="text-[10px] text-slate-500 max-w-[200px] mx-auto mt-0.5">Scouts execute direct phone triggers from active Discovery tabs upon review.</p>
+                <p className="text-xs font-bold text-slate-400">No Meetup Invites Active</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
                 {trialInvites.map((invite) => (
-                  <div key={invite.id} className="p-3.5 bg-[#080d10] border border-slate-800 rounded-xl space-y-2.5">
-                    
+                  <div key={invite.id} className="p-3 bg-[#080d10] border border-slate-800 rounded-xl space-y-2">
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="text-xs font-bold text-white capitalize">{invite.scout_name}</h4>
-                        <span className="text-[10px] text-slate-400 font-medium block">{invite.academy_name}</span>
+                        <span className="text-[9px] text-slate-400 block">{invite.academy_name}</span>
                       </div>
-                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded ${
+                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
                         invite.status.includes("Accepted") ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                       }`}>
                         {invite.status}
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-[11px] bg-[#0c1419] p-2.5 rounded-lg border border-slate-800/60">
+                    <div className="space-y-1 text-[10px] bg-[#0c1419] p-2 rounded border border-slate-800/60">
                       <div className="flex items-center gap-1.5 text-slate-300">
                         <MapPin className="w-3 h-3 text-blue-400 flex-shrink-0" />
                         <span className="truncate">{invite.trial_location}</span>
@@ -438,40 +503,27 @@ export default function AthleteDashboard() {
                       </div>
                     </div>
 
-                    {invite.notes && <p className="text-[10px] text-slate-400 leading-snug italic">"{invite.notes}"</p>}
-
-                    <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                      <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+                    <div className="pt-1 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
                         <Phone className="w-3 h-3 flex-shrink-0" />
-                        <span className="select-all">{invite.contact_info}</span>
+                        <span>{invite.contact_info}</span>
                       </div>
-
                       {!invite.status.includes("Accepted") && (
-                        <button 
-                          onClick={() => handleAcknowledgeInvite(invite.id)}
-                          className="w-full sm:w-auto px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded text-[10px] transition-colors cursor-pointer"
-                        >
-                          Lock In Trial
-                        </button>
+                        <button onClick={() => handleAcknowledgeInvite(invite.id)} className="px-2 py-0.5 bg-emerald-500 text-black font-bold rounded text-[9px]">Lock In Trial</button>
                       )}
                     </div>
-
                   </div>
                 ))}
               </div>
             )}
-
-            <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-500 leading-snug">
-              ⚠️ Direct phone metadata is unlocked securely inside candidate portals upon scout query generation.
-            </div>
           </div>
 
-          {/* Regular Verification Admonition View */}
-          <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-6 space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Matrix Status</h3>
-            <div className="space-y-2.5 text-xs text-slate-300">
-              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> Cloud Token Active</div>
-              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> Direct Outreach Router Active</div>
+          {/* Admonition Integrity Layout */}
+          <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Status</h3>
+            <div className="space-y-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> DMs Active</div>
+              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> Router Linked</div>
             </div>
           </div>
 
@@ -479,13 +531,11 @@ export default function AthleteDashboard() {
 
       </div>
 
-      {/* METADATA REVISION FORM */}
+      {/* METADATA FORM */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0c1419] border border-slate-800 w-full max-w-md rounded-3xl p-6 relative shadow-2xl">
-            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-white mb-1">Revise Professional Metrics</h3>
             <form onSubmit={handleSaveMetrics} className="space-y-3 mt-4">
               <div className="grid grid-cols-2 gap-3">
@@ -507,9 +557,7 @@ export default function AthleteDashboard() {
       {isCredModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0c1419] border border-slate-800 w-full max-w-lg rounded-3xl p-6 relative shadow-2xl">
-            <button onClick={() => setIsCredModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={() => setIsCredModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-white mb-1">Link Verified Credential</h3>
             {modalError && <div className="p-3 mb-3 bg-red-500/10 text-red-400 text-xs rounded-xl">{modalError}</div>}
             <form onSubmit={handleCommitCredential} className="space-y-3 mt-4">
