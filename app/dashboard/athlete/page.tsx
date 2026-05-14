@@ -40,13 +40,16 @@ interface TrialInvite {
 
 interface DirectMessage {
   id: string;
+  sender_id?: string;
+  receiver_id?: string;
   sender_name: string;
+  receiver_name?: string;
   message: string;
   created_at: string;
 }
 
 export default function AthleteDashboard() {
-  const [activeTab, setActiveTab] = useState("credentials"); // Show credentials tab natively to review verified statuses
+  const [activeTab, setActiveTab] = useState("credentials");
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -70,6 +73,11 @@ export default function AthleteDashboard() {
   const [availableTourneys, setAvailableTourneys] = useState<any[]>([]);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
+
+  // Two-Way Direct Messaging UI States
+  const [activeChatScout, setActiveChatScout] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   // Modal Controllers
   const [isCredModalOpen, setIsCredModalOpen] = useState(false);
@@ -144,14 +152,18 @@ export default function AthleteDashboard() {
     }
   };
 
-  // Retrieve complete credential matrices mapping pending/verified statuses live
+  // Parallel reads extracting inbound data streams along with Two-Way message indexes
   const fetchIntegratedMatrix = async (targetId: string) => {
     setLoadingAssets(true);
     const [achRes, reelsRes, invitesRes, messagesRes] = await Promise.all([
       supabase.from("achievements").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false }),
       supabase.from("reels").select("id, video_url, caption, likes_count").eq("athlete_id", targetId).order("created_at", { ascending: false }),
       supabase.from("trial_invitations").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false }),
-      supabase.from("direct_messages").select("*").eq("receiver_id", targetId).order("created_at", { ascending: false })
+      // Query messages where the current athlete is EITHER the designated recipient OR the sender
+      supabase.from("direct_messages")
+        .select("*")
+        .or(`receiver_id.eq.${targetId},sender_id.eq.${targetId}`)
+        .order("created_at", { ascending: false })
     ]);
 
     if (achRes.data) setAchievements(achRes.data);
@@ -188,7 +200,6 @@ export default function AthleteDashboard() {
     }
   };
 
-  // INSTITUTIONAL AUTHENTICATION ROUTE: Save record instantly into an Institutional Verification state
   const handleCommitCredential = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
@@ -209,7 +220,6 @@ export default function AthleteDashboard() {
           date_achieved: newDate.trim(),
           description: newDescription.trim() !== "" ? newDescription : "Verifiable milestone framework pending institutional confirmation.",
           document_url: documentPath !== "" ? documentPath : null,
-          // CRITICAL: Force record to pend verification directly from Tagged Entity dashboard
           verification_status: "Pending Institutional Verification ⏳" 
         }])
         .select();
@@ -291,6 +301,46 @@ export default function AthleteDashboard() {
       setJoiningId(null);
     }
   };
+
+  // BIDIRECTIONAL REPLY LOGIC: Commit response messages back to target recruiter scopes
+  const handleSendReply = async (e: React.FormEvent, targetScoutName: string) => {
+    e.preventDefault();
+    if (!userId || !replyMessage.trim()) return;
+    setSendingReply(true);
+
+    // Locate preceding inbound threads to map direct foreign key receiver targets flawlessly
+    const scoutMsg = inboxMessages.find(m => m.sender_name === targetScoutName && m.sender_id);
+    const targetScoutId = scoutMsg?.sender_id || null;
+
+    try {
+      const { data, error } = await supabase.from("direct_messages").insert([{
+        sender_id: userId,
+        sender_name: profileName || "Athlete",
+        receiver_id: targetScoutId,
+        receiver_name: targetScoutName,
+        message: replyMessage.trim(),
+        created_at: new Date().toISOString()
+      }]).select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // Hydrate direct local array storage instantaneously
+        setInboxMessages(prev => [data[0], ...prev]);
+        setReplyMessage("");
+      }
+    } catch (err: any) {
+      console.error("Transmission response block:", err);
+      alert(`⚠️ Message error: ${err.message || "Database execution dropped."}`);
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Group threads dynamically by unique interaction participant identities
+  const uniqueScouts = Array.from(new Set(
+    inboxMessages.map(m => m.sender_name === profileName ? m.receiver_name : m.sender_name).filter(Boolean)
+  )) as string[];
 
   return (
     <div className="min-h-screen bg-[#080d10] text-slate-100 pb-12 relative select-none">
@@ -395,7 +445,7 @@ export default function AthleteDashboard() {
             </button>
           </div>
 
-          {/* TAB 1: CREDENTIALS FEED WITH LIVE VERIFICATION LOOP CONTROLS */}
+          {/* TAB 1: CREDENTIALS FEED WITH VERIFICATION STATE LOGS */}
           {activeTab === "credentials" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-[#0c1419] p-4 rounded-xl border border-slate-800">
@@ -428,7 +478,6 @@ export default function AthleteDashboard() {
                           isRejected ? "border-red-500/30 opacity-60" : isPending ? "border-amber-500/40" : "border-slate-800/80 hover:border-slate-700"
                         }`}
                       >
-                        {/* CONDITIONAL RESTRICTION / AUTHENTICATION HEADER BANNER */}
                         {isPending && (
                           <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center gap-2 text-amber-400 text-xs font-bold">
                             <AlertTriangle className="w-4 h-4 shrink-0 stroke-[2.5]" />
@@ -451,7 +500,6 @@ export default function AthleteDashboard() {
                               <span className="text-xs text-slate-500 font-mono">• {item.date_achieved}</span>
                             </div>
                             
-                            {/* DYNAMIC VERIFICATION BADGE RENDERING */}
                             {!isPending && !isRejected && (
                               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded flex items-center gap-1 border border-emerald-500/20 shadow-xs">
                                 <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" /> Verified by Institution ✓
@@ -580,42 +628,127 @@ export default function AthleteDashboard() {
 
         {/* RIGHT SIDEBAR MODULES */}
         <div className="lg:col-span-4 space-y-6">
+          
+          {/* UPDATED BIDIRECTIONAL DIRECT MESSAGING WORKSPACE */}
           <div className="bg-[#0c1419] border-2 border-emerald-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
             
-            <div className="flex justify-between items-start">
-              <div>
+            <div className="flex justify-between items-center">
+              <div className="pr-2 truncate">
                 <span className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider block">Recruitment Network</span>
-                <h3 className="text-sm font-bold text-white mt-0.5">Secure Direct Inbox</h3>
+                <h3 className="text-sm font-bold text-white mt-0.5 truncate max-w-[170px]">
+                  {activeChatScout ? `Chat: ${activeChatScout}` : "Secure Direct Inbox"}
+                </h3>
               </div>
-              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
-                {inboxMessages.length} DMs
-              </span>
+              
+              {/* Dynamic Action toggle buttons rendering Thread view exit backstops */}
+              {activeChatScout ? (
+                <button 
+                  onClick={() => setActiveChatScout(null)}
+                  className="text-[9px] text-slate-400 hover:text-white font-extrabold bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 transition-colors cursor-pointer shrink-0"
+                >
+                  ← Threads
+                </button>
+              ) : (
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono shrink-0">
+                  {uniqueScouts.length} Threads
+                </span>
+              )}
             </div>
 
-            {loadingAssets ? (
-              <div className="py-8 text-center text-xs text-slate-500"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-emerald-400" /> Caching DMs...</div>
-            ) : inboxMessages.length === 0 ? (
-              <div className="py-8 text-center border border-slate-800/80 rounded-xl bg-[#080d10]">
-                <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-1 stroke-[1.5]" />
-                <p className="text-xs font-bold text-slate-400">Inbox is Clear</p>
-                <p className="text-[10px] text-slate-500 max-w-[200px] mx-auto mt-0.5">Direct scout outreach chat notifications surface here instantaneously.</p>
+            {/* CONDITIONAL RENDER: CONVERSATION STREAM LAYOUT VS ACTIVE SCOUT DIRECTORIES */}
+            {activeChatScout ? (
+              <div className="space-y-3 pt-1">
+                {/* Conversation Stream */}
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 flex flex-col">
+                  {inboxMessages
+                    .filter(m => m.sender_name === activeChatScout || m.receiver_name === activeChatScout)
+                    .slice()
+                    .reverse() // Display chronological messaging order seamlessly
+                    .map((msg) => {
+                      const isOutgoing = msg.sender_name === profileName || msg.sender_id === userId;
+                      return (
+                        <div 
+                          key={msg.id} 
+                          className={`p-3 rounded-xl max-w-[85%] text-xs leading-relaxed break-words shadow-xs ${
+                            isOutgoing 
+                              ? "bg-emerald-500 text-black font-bold self-end rounded-br-xs" 
+                              : "bg-[#080d10] border border-slate-800 text-slate-200 self-start rounded-bl-xs font-medium"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center gap-3 mb-1 opacity-75 text-[8px] font-mono border-b border-black/10 pb-0.5">
+                            <span className="font-extrabold capitalize">{isOutgoing ? "You" : msg.sender_name}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap">{msg.message}</p>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Instant Real-Time Target Submission Form */}
+                <form onSubmit={(e) => handleSendReply(e, activeChatScout)} className="flex gap-2 pt-2 border-t border-slate-800/80">
+                  <input 
+                    type="text" 
+                    placeholder="Type reply..."
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    className="flex-1 bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500 font-medium placeholder:text-slate-600"
+                    required
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={sendingReply}
+                    className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl text-xs transition-all shrink-0 cursor-pointer disabled:opacity-40"
+                  >
+                    {sendingReply ? "..." : "Send"}
+                  </button>
+                </form>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                {inboxMessages.map((msg) => (
-                  <div key={msg.id} className="p-3 bg-[#080d10] border border-slate-800 rounded-xl space-y-1.5">
-                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
-                      <span className="text-xs font-bold text-emerald-400 capitalize">{msg.sender_name}</span>
-                      <span className="text-[9px] text-slate-500 font-mono">Just now</span>
-                    </div>
-                    <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap break-words">{msg.message}</p>
-                  </div>
-                ))}
-              </div>
+              /* ACTIVE THREADS DIRECTORY LISTING */
+              loadingAssets ? (
+                <div className="py-8 text-center text-xs text-slate-500">
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-emerald-400" /> Caching threads...
+                </div>
+              ) : uniqueScouts.length === 0 ? (
+                <div className="py-8 text-center border border-slate-800/80 rounded-xl bg-[#080d10]">
+                  <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-1 stroke-[1.5]" />
+                  <p className="text-xs font-bold text-slate-400">Inbox is Clear</p>
+                  <p className="text-[10px] text-slate-500 max-w-[200px] mx-auto mt-0.5">Direct scout outreach chat notifications surface here instantaneously.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {uniqueScouts.map((scoutName) => {
+                    const latestMsg = inboxMessages.find(m => m.sender_name === scoutName || m.receiver_name === scoutName);
+                    const isOutgoingPreview = latestMsg?.sender_name === profileName;
+                    
+                    return (
+                      <div 
+                        key={scoutName} 
+                        onClick={() => setActiveChatScout(scoutName)}
+                        className="p-3 bg-[#080d10] hover:bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-xl transition-all flex items-center justify-between cursor-pointer group"
+                      >
+                        <div className="space-y-1 truncate pr-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-emerald-400 capitalize truncate">{scoutName}</span>
+                            <span className="text-[8px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-500/20 shrink-0 font-mono font-bold">Active Chat</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate italic">
+                            {latestMsg ? `${isOutgoingPreview ? "You: " : ""}${latestMsg.message}` : "Open conversation stream..."}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-black text-slate-500 group-hover:text-emerald-400 shrink-0 transition-colors">
+                          Chat →
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
 
+          {/* PHYSICAL MEETUP INVITATION MODULE */}
           <div className="bg-[#0c1419] border-2 border-blue-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-teal-400" />
             
@@ -681,7 +814,7 @@ export default function AthleteDashboard() {
           <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-5 space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Status</h3>
             <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> DMs Active</div>
+              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Chat Sync Active</div>
               <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Router Linked</div>
             </div>
           </div>
