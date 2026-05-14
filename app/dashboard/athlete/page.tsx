@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   MapPin, Users, CheckCircle, Award, Loader2, PlusCircle, 
-  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar, MessageSquare, Trophy
+  ExternalLink, FileText, X, Check, Edit3, Video, Grid, Layers, Phone, Calendar, MessageSquare, Trophy, AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -46,7 +46,7 @@ interface DirectMessage {
 }
 
 export default function AthleteDashboard() {
-  const [activeTab, setActiveTab] = useState("credentials");
+  const [activeTab, setActiveTab] = useState("credentials"); // Show credentials tab natively to review verified statuses
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -66,6 +66,11 @@ export default function AthleteDashboard() {
   const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
+  // Operational Marketplace Routing Arrays
+  const [availableTourneys, setAvailableTourneys] = useState<any[]>([]);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [loadingMarketplace, setLoadingMarketplace] = useState(true);
+
   // Modal Controllers
   const [isCredModalOpen, setIsCredModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -83,7 +88,6 @@ export default function AthleteDashboard() {
   const [modalError, setModalError] = useState("");
   const [savingMetrics, setSavingMetrics] = useState(false);
 
-  // Initialize profile contexts and bind concurrent data arrays
   useEffect(() => {
     const initializeEcosystemView = async () => {
       setLoadingProfile(true);
@@ -113,16 +117,36 @@ export default function AthleteDashboard() {
 
         await fetchIntegratedMatrix(session.user.id);
       }
+      
+      await fetchLiveTournaments();
       setLoadingProfile(false);
     };
 
     initializeEcosystemView();
   }, []);
 
-  // Secure parallel extraction for 4 separate data dependencies
+  const fetchLiveTournaments = async () => {
+    setLoadingMarketplace(true);
+    try {
+      const { data, error } = await supabase
+        .from("live_tournaments")
+        .select("*")
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setAvailableTourneys(data);
+      }
+    } catch (err) {
+      console.error("Dynamic table retrieval index execution drop:", err);
+    } finally {
+      setLoadingMarketplace(false);
+    }
+  };
+
+  // Retrieve complete credential matrices mapping pending/verified statuses live
   const fetchIntegratedMatrix = async (targetId: string) => {
     setLoadingAssets(true);
-    
     const [achRes, reelsRes, invitesRes, messagesRes] = await Promise.all([
       supabase.from("achievements").select("*").eq("athlete_id", targetId).order("created_at", { ascending: false }),
       supabase.from("reels").select("id, video_url, caption, likes_count").eq("athlete_id", targetId).order("created_at", { ascending: false }),
@@ -134,11 +158,9 @@ export default function AthleteDashboard() {
     if (reelsRes.data) setUserReels(reelsRes.data);
     if (invitesRes.data) setTrialInvites(invitesRes.data);
     if (messagesRes.data) setInboxMessages(messagesRes.data);
-    
     setLoadingAssets(false);
   };
 
-  // Dispatch raw binary files directly to Supabase global documents pool
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!e.target.files || e.target.files.length === 0 || !userId) return;
@@ -166,29 +188,30 @@ export default function AthleteDashboard() {
     }
   };
 
-  // Commit dynamic documented posts complete with descriptive layers
+  // INSTITUTIONAL AUTHENTICATION ROUTE: Save record instantly into an Institutional Verification state
   const handleCommitCredential = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
     setSubmittingRecord(true);
     setModalError("");
 
+    const targetOrg = newOrgName.trim() || "Unspecified Academy";
+
     try {
       const { data, error } = await supabase
         .from("achievements")
-        .insert([
-          {
-            athlete_id: userId,
-            title: newTitle,
-            organization_name: newOrgName,
-            organization_link: newOrgLink.trim() !== "" ? newOrgLink : null,
-            category: newCategory,
-            date_achieved: newDate,
-            description: newDescription.trim() !== "" ? newDescription : "Verified milestone execution tracked internally by ecosystem credentials protocol.",
-            document_url: documentPath !== "" ? documentPath : null,
-            verification_status: documentPath !== "" ? "Verified Document Attached" : "Pending Verification"
-          }
-        ])
+        .insert([{
+          athlete_id: userId,
+          title: newTitle.trim(),
+          organization_name: targetOrg,
+          organization_link: newOrgLink.trim() !== "" ? newOrgLink : null,
+          category: newCategory,
+          date_achieved: newDate.trim(),
+          description: newDescription.trim() !== "" ? newDescription : "Verifiable milestone framework pending institutional confirmation.",
+          document_url: documentPath !== "" ? documentPath : null,
+          // CRITICAL: Force record to pend verification directly from Tagged Entity dashboard
+          verification_status: "Pending Institutional Verification ⏳" 
+        }])
         .select();
 
       if (error) throw error;
@@ -197,6 +220,7 @@ export default function AthleteDashboard() {
         setAchievements([data[0], ...achievements]);
         setNewTitle(""); setNewOrgName(""); setNewOrgLink(""); setNewDate(""); setNewDescription(""); setDocumentPath("");
         setIsCredModalOpen(false);
+        alert(`⏳ Verification Request Transmitted! A formal verification check has been securely routed to ${targetOrg}. Your certificate will automatically switch to active status once the institution authenticates it.`);
       }
     } catch (error: any) {
       console.error("Commit error:", error);
@@ -206,7 +230,6 @@ export default function AthleteDashboard() {
     }
   };
 
-  // Apply metric parameter changes securely to the cloud profiles table
   const handleSaveMetrics = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
@@ -226,7 +249,6 @@ export default function AthleteDashboard() {
     }
   };
 
-  // Dynamically set scout trial invite states
   const handleAcknowledgeInvite = async (inviteId: string) => {
     try {
       const { error } = await supabase
@@ -242,13 +264,41 @@ export default function AthleteDashboard() {
     }
   };
 
+  const handleJoinTournament = async (tourney: any) => {
+    if (!userId) {
+      alert("⚠️ Identity layer unlinked. Authenticate account state to lock in contingent records.");
+      return;
+    }
+    setJoiningId(tourney.id);
+    
+    try {
+      const { error } = await supabase.from("live_registrations").insert([{
+        tournament_ref_id: tourney.id,
+        tournament_name: tourney.title,
+        sport: tourney.sport,
+        captain_id: userId,
+        captain_name: profileName,
+        team_name: `${profileName} Contingent`,
+        status: "pending"
+      }]);
+
+      if (error) throw error;
+      alert(`✨ Request Validated! Application metadata successfully broadcasted directly into "${tourney.title}" admin monitoring pools.`);
+    } catch (err: any) {
+      console.error("Write execution dropped:", err);
+      alert(`⚠️ Sync Drop: ${err.message || "Database configuration mismatch."}`);
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#080d10] text-slate-100 pb-12 relative">
+    <div className="min-h-screen bg-[#080d10] text-slate-100 pb-12 relative select-none">
       <header className="border-b border-slate-800/80 bg-[#080d10]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button 
             onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-            className="flex items-center gap-2 text-xs font-bold text-red-400/80 hover:text-red-400 transition-colors border border-red-500/20 bg-red-500/5 px-3 py-1.5 rounded-lg cursor-pointer"
+            className="flex items-center gap-2 text-xs font-bold text-red-400/80 hover:text-red-400 transition-colors border border-red-500/20 bg-red-500/5 px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
           >
             Sign Out OS
           </button>
@@ -258,7 +308,6 @@ export default function AthleteDashboard() {
         </div>
       </header>
 
-      {/* Hero Workspace Frame */}
       <div className="max-w-7xl mx-auto px-6 pt-8">
         <div className="bg-[#0c1419] border border-slate-800/80 rounded-3xl p-6 sm:p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
@@ -293,13 +342,14 @@ export default function AthleteDashboard() {
               </div>
             </div>
 
-            {/* DYNAMIC ACTION TRIGGER SET (WITH INTEGRATED COMMUNITY HUB HOOK) */}
-            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end">
+            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end shrink-0">
               <button 
-                onClick={() => window.location.href = "/tournaments"}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-400 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-800 cursor-pointer"
+                onClick={() => { setActiveTab("tournaments"); fetchLiveTournaments(); }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                  activeTab === "tournaments" ? "bg-blue-500 text-white border-blue-400 shadow-lg shadow-blue-500/10" : "bg-slate-900 hover:bg-slate-800 text-blue-400 border-slate-800"
+                }`}
               >
-                <Trophy className="w-3.5 h-3.5 text-blue-400" /> Tournaments
+                <Trophy className="w-3.5 h-3.5" /> Marketplace Live
               </button>
               <button 
                 onClick={() => window.location.href = "/communities"}
@@ -315,7 +365,7 @@ export default function AthleteDashboard() {
               </button>
               <button 
                 onClick={() => setIsCredModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/10 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/10 cursor-pointer shrink-0"
               >
                 <PlusCircle className="w-4 h-4 stroke-[2.5]" /> Link Credential
               </button>
@@ -324,66 +374,173 @@ export default function AthleteDashboard() {
         </div>
       </div>
 
-      {/* Main Framework Grid Architecture */}
       <div className="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* LEFT PRIMARY MATRIX WORKSPACE */}
         <div className="lg:col-span-8 space-y-6">
           <div className="flex items-center gap-1.5 border-b border-slate-800 pb-px overflow-x-auto">
-            <button onClick={() => setActiveTab("credentials")} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "credentials" ? "text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5" : "text-slate-400 hover:text-slate-200"}`}>
-              <Layers className="w-3.5 h-3.5" /> Posts & Credentials
+            <button onClick={() => { setActiveTab("credentials"); if(userId) fetchIntegratedMatrix(userId); }} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "credentials" ? "text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5" : "text-slate-400 hover:text-slate-200"}`}>
+              <Layers className="w-3.5 h-3.5 shrink-0" /> Posts & Credentials
+            </button>
+            <button onClick={() => { setActiveTab("tournaments"); fetchLiveTournaments(); }} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "tournaments" ? "text-blue-400 border-b-2 border-blue-500 bg-blue-500/5" : "text-slate-400 hover:text-slate-200"}`}>
+              <Trophy className="w-3.5 h-3.5 shrink-0" /> Live Tournaments
             </button>
             <button onClick={() => setActiveTab("reels")} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "reels" ? "text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5" : "text-slate-400 hover:text-slate-200"}`}>
-              <Grid className="w-3.5 h-3.5" /> Reels Grid
+              <Grid className="w-3.5 h-3.5 shrink-0" /> Reels Grid
             </button>
             <button onClick={() => setActiveTab("about")} className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeTab === "about" ? "text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5" : "text-slate-400 hover:text-slate-200"}`}>
-              <FileText className="w-3.5 h-3.5" /> About & Metrics
+              <FileText className="w-3.5 h-3.5 shrink-0" /> About & Metrics
             </button>
             
-            <button onClick={() => window.location.href = "/feed"} className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg text-[11px] font-bold text-emerald-400 transition-all flex items-center gap-1 ml-auto flex-shrink-0 cursor-pointer">
-              <Video className="w-3 h-3 text-emerald-400" /> Watch Feed
+            <button onClick={() => window.location.href = "/feed"} className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg text-[11px] font-bold text-emerald-400 transition-all flex items-center gap-1 ml-auto shrink-0 cursor-pointer">
+              <Video className="w-3 h-3 text-emerald-400 shrink-0" /> Watch Feed
             </button>
           </div>
 
-          {/* TAB 1: VERIFIED POSTS LAYOUT */}
+          {/* TAB 1: CREDENTIALS FEED WITH LIVE VERIFICATION LOOP CONTROLS */}
           {activeTab === "credentials" && (
             <div className="space-y-4">
+              <div className="flex justify-between items-center bg-[#0c1419] p-4 rounded-xl border border-slate-800">
+                 <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Authentication Checkpoint</span>
+                    <p className="text-xs text-slate-300 font-medium">Tagged items trigger secure verification handshakes directly with registered institutions.</p>
+                 </div>
+                 <button 
+                   onClick={() => userId && fetchIntegratedMatrix(userId)}
+                   className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold border border-slate-800 transition-all cursor-pointer shrink-0"
+                 >
+                   ↻ Refresh Queue
+                 </button>
+              </div>
+
               {loadingAssets ? (
                 <div className="py-16 text-center border border-slate-800/50 rounded-2xl bg-[#0c1419]/40"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-emerald-500" /> Indexing Timeline Ledgers...</div>
               ) : achievements.length === 0 ? (
                 <div className="py-12 text-center border border-slate-800 rounded-2xl bg-[#0c1419]"><Award className="w-10 h-10 mx-auto mb-2 text-slate-700" /><p className="text-sm font-bold text-white">No Track Records Uploaded</p></div>
               ) : (
                 <div className="space-y-6">
-                  {achievements.map((item) => (
-                    <div key={item.id} className="bg-[#0c1419] border border-slate-800/80 rounded-2xl overflow-hidden transition-all hover:border-slate-700 flex flex-col">
-                      <div className="p-5 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{item.category}</span>
-                            <span className="text-xs text-slate-500 font-mono">• {item.date_achieved}</span>
+                  {achievements.map((item) => {
+                    const isPending = item.verification_status?.includes("Pending");
+                    const isRejected = item.verification_status?.includes("Rejected");
+                    
+                    return (
+                      <div 
+                        key={item.id} 
+                        className={`bg-[#0c1419] border rounded-2xl overflow-hidden transition-all flex flex-col ${
+                          isRejected ? "border-red-500/30 opacity-60" : isPending ? "border-amber-500/40" : "border-slate-800/80 hover:border-slate-700"
+                        }`}
+                      >
+                        {/* CONDITIONAL RESTRICTION / AUTHENTICATION HEADER BANNER */}
+                        {isPending && (
+                          <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 flex items-center gap-2 text-amber-400 text-xs font-bold">
+                            <AlertTriangle className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                            <span>Verification Hold: Awaiting formal confirmation sign-off from {item.organization_name}</span>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Verified Document Attached</span>
+                        )}
+
+                        {isRejected && (
+                          <div className="bg-red-500/10 border-b border-red-500/20 px-5 py-2 flex items-center gap-2 text-red-400 text-xs font-bold">
+                            <span>❌ Authority Handshake Dropped: Institutional sign-off declined by target administration.</span>
+                          </div>
+                        )}
+
+                        <div className="p-5 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded tracking-wide bg-slate-900 text-emerald-400 border border-slate-800 uppercase">
+                                {item.category}
+                              </span>
+                              <span className="text-xs text-slate-500 font-mono">• {item.date_achieved}</span>
+                            </div>
+                            
+                            {/* DYNAMIC VERIFICATION BADGE RENDERING */}
+                            {!isPending && !isRejected && (
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded flex items-center gap-1 border border-emerald-500/20 shadow-xs">
+                                <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" /> Verified by Institution ✓
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <h4 className="text-lg font-bold text-white tracking-tight leading-tight">{item.title}</h4>
+                            {item.description && <p className="text-xs text-slate-300 mt-2 leading-relaxed bg-[#080d10] p-3 rounded-xl border border-slate-800/40">{item.description}</p>}
+                            
+                            <div className="flex items-center gap-2 mt-3 text-xs text-slate-400">
+                              <span>Tagged Authentication Entity:</span>
+                              <strong className="text-slate-200 bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 font-bold">
+                                {item.organization_name}
+                              </strong>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-lg font-bold text-white leading-tight">{item.title}</h4>
-                          {item.description && <p className="text-xs text-slate-300 mt-2 leading-relaxed bg-[#080d10] p-3 rounded-xl border border-slate-800/40">{item.description}</p>}
-                          <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                            <span className="text-xs text-slate-400">Authorized entity association:</span>
-                            <strong className="text-slate-300 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">{item.organization_name}</strong>
+
+                        {item.document_url && (
+                          <div className="border-t border-slate-800/80 bg-[#080d10] p-3 flex justify-center">
+                            <div className="w-full max-h-[350px] overflow-hidden rounded-xl border border-slate-800/60 relative bg-black flex items-center justify-center">
+                              <img src={item.document_url} alt="Verification Asset Proof" className="w-full h-full object-contain max-h-[340px]" loading="lazy" />
+                            </div>
                           </div>
+                        )}
+
+                        <div className="p-3 bg-[#080d10] border-t border-slate-800/40 flex justify-between items-center text-[10px] text-slate-500">
+                          <span className="font-mono">Sync Ref: {item.id.slice(0, 8)}...</span>
+                          <span className={`font-extrabold capitalize tracking-wider ${isPending ? 'text-amber-500' : isRejected ? 'text-red-500' : 'text-emerald-500'}`}>
+                            Status: {item.verification_status?.split(" ")[0]}
+                          </span>
                         </div>
                       </div>
-                      {item.document_url && (
-                        <div className="border-t border-slate-800/80 bg-[#080d10] p-3 flex justify-center">
-                          <div className="w-full max-h-[350px] overflow-hidden rounded-xl border border-slate-800/60 relative bg-black flex items-center justify-center">
-                            <img src={item.document_url} alt="Verification Asset Proof" className="w-full h-full object-contain max-h-[340px]" loading="lazy" />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: LIVE TOURNAMENTS FEED */}
+          {activeTab === "tournaments" && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl">
+                 <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Live Cloud Registry Sync</span>
+                    <h4 className="text-xs font-bold text-white">Verifiable Circuit Ecosystem Listing</h4>
+                 </div>
+                 <button 
+                   onClick={() => fetchLiveTournaments()} 
+                   className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold border border-blue-500/20 transition-all cursor-pointer shrink-0"
+                 >
+                   ↻ Synchronize Views
+                 </button>
+              </div>
+              
+              {loadingMarketplace ? (
+                <div className="py-16 text-center border border-slate-800/50 rounded-2xl bg-[#0c1419]/40">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-500" /> 
+                  Querying live operational parameters...
+                </div>
+              ) : availableTourneys.length === 0 ? (
+                <div className="py-12 text-center border border-slate-800 rounded-2xl bg-[#0c1419]">
+                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">No Active Tournaments Broadcasted</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availableTourneys.map((t) => (
+                    <div key={t.id} className="bg-[#0c1419] border border-slate-800 p-6 rounded-2xl space-y-4 hover:border-blue-500/60 transition-all flex flex-col justify-between">
+                       <div>
+                          <div className="flex justify-between items-start">
+                             <span className="text-[10px] font-black bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 uppercase tracking-wider">{t.sport}</span>
+                             <span className="text-emerald-400 font-extrabold text-xs">{t.prize_pool || "TBD Payout"}</span>
                           </div>
-                        </div>
-                      )}
-                      <div className="p-3 bg-[#080d10] border-t border-slate-800/40 flex justify-between items-center text-[10px] text-slate-500">
-                        <span>Database Key Identifier: {item.id.slice(0, 8)}...</span>
-                        <button onClick={() => window.location.href = "/sponsors"} className="text-amber-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer">Browse Brand Sponsorship Deals →</button>
-                      </div>
+                          <h3 className="text-base font-bold text-white tracking-tight mt-2">{t.title}</h3>
+                          <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 font-semibold mt-3 pt-3 border-t border-slate-800/60">
+                             <span className="bg-[#080d10] px-2 py-1 rounded border border-slate-800 shrink-0">Capacity: {t.max_slots || 16} Teams</span>
+                             <span className="bg-[#080d10] px-2 py-1 rounded border border-slate-800 shrink-0">Gate Fee: {t.entry_fee || "Free"}</span>
+                          </div>
+                       </div>
+                       <button 
+                         onClick={() => handleJoinTournament(t)}
+                         disabled={joiningId === t.id}
+                         className="w-full py-3.5 bg-blue-500 hover:bg-blue-400 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 shrink-0 disabled:opacity-50"
+                       >
+                         {joiningId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "TRANSMIT SQUAD ROSTER REQUEST"}
+                       </button>
                     </div>
                   ))}
                 </div>
@@ -391,7 +548,7 @@ export default function AthleteDashboard() {
             </div>
           )}
 
-          {/* TAB 2: PERSONAL VIDEO LOOPS */}
+          {/* TAB 3: REELS GRID */}
           {activeTab === "reels" && (
             <div className="space-y-4">
               {loadingAssets ? (
@@ -410,7 +567,7 @@ export default function AthleteDashboard() {
             </div>
           )}
 
-          {/* TAB 3: EXTENDED METRICS BIO */}
+          {/* TAB 4: EXTENDED BIO */}
           {activeTab === "about" && (
             <div className="space-y-4">
               <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-6 space-y-3">
@@ -421,10 +578,8 @@ export default function AthleteDashboard() {
           )}
         </div>
 
-        {/* RIGHT SIDEBAR MODULES: HIGH VISIBILITY DIRECT MESSAGES & CALL-UP MATRIX */}
+        {/* RIGHT SIDEBAR MODULES */}
         <div className="lg:col-span-4 space-y-6">
-          
-          {/* DIRECT MESSAGING CHAT BOX PIPELINE VIEW */}
           <div className="bg-[#0c1419] border-2 border-emerald-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
             
@@ -461,7 +616,6 @@ export default function AthleteDashboard() {
             )}
           </div>
 
-          {/* PHYSICAL MEETUP INVITATION MODULE */}
           <div className="bg-[#0c1419] border-2 border-blue-500/30 rounded-2xl p-6 space-y-4 relative overflow-hidden shadow-xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-teal-400" />
             
@@ -500,22 +654,22 @@ export default function AthleteDashboard() {
 
                     <div className="space-y-1 text-[10px] bg-[#0c1419] p-2 rounded border border-slate-800/60">
                       <div className="flex items-center gap-1.5 text-slate-300">
-                        <MapPin className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                        <MapPin className="w-3 h-3 text-blue-400 shrink-0" />
                         <span className="truncate">{invite.trial_location}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-slate-300">
-                        <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                        <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
                         <span className="truncate">{invite.trial_date}</span>
                       </div>
                     </div>
 
                     <div className="pt-1 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
                       <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
-                        <Phone className="w-3 h-3 flex-shrink-0" />
+                        <Phone className="w-3 h-3 shrink-0" />
                         <span>{invite.contact_info}</span>
                       </div>
                       {!invite.status.includes("Accepted") && (
-                        <button onClick={() => handleAcknowledgeInvite(invite.id)} className="px-2 py-0.5 bg-emerald-500 text-black font-bold rounded text-[9px]">Lock In Trial</button>
+                        <button onClick={() => handleAcknowledgeInvite(invite.id)} className="px-2 py-0.5 bg-emerald-500 text-black font-bold rounded text-[9px] shrink-0">Lock In Trial</button>
                       )}
                     </div>
                   </div>
@@ -524,36 +678,33 @@ export default function AthleteDashboard() {
             )}
           </div>
 
-          {/* Admonition Integrity Layout */}
           <div className="bg-[#0c1419] border border-slate-800 rounded-2xl p-5 space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Status</h3>
             <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> DMs Active</div>
-              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> Router Linked</div>
+              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> DMs Active</div>
+              <div className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Router Linked</div>
             </div>
           </div>
-
         </div>
-
       </div>
 
       {/* METADATA FORM */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0c1419] border border-slate-800 w-full max-w-md rounded-3xl p-6 relative shadow-2xl">
-            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white shrink-0"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-white mb-1">Revise Professional Metrics</h3>
             <form onSubmit={handleSaveMetrics} className="space-y-3 mt-4">
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" required value={age} onChange={(e) => setAge(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
                 <input type="text" required value={height} onChange={(e) => setHeight(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
               </div>
-              <select value={prefSide} onChange={(e) => setPrefSide(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-semibold">
+              <select value={prefSide} onChange={(e) => setPrefSide(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-semibold cursor-pointer">
                 <option value="Right">Right Foot / Hand</option>
                 <option value="Left">Left Foot / Hand</option>
               </select>
               <textarea required rows={4} value={aboutMe} onChange={(e) => setAboutMe(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none" />
-              <button type="submit" disabled={savingMetrics} className="w-full py-3 bg-emerald-500 text-black font-extrabold text-xs rounded-xl mt-4">Store Persistent Profile Update</button>
+              <button type="submit" disabled={savingMetrics} className="w-full py-3 bg-emerald-500 text-black font-extrabold text-xs rounded-xl mt-4 shrink-0">Store Persistent Profile Update</button>
             </form>
           </div>
         </div>
@@ -563,30 +714,32 @@ export default function AthleteDashboard() {
       {isCredModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0c1419] border border-slate-800 w-full max-w-lg rounded-3xl p-6 relative shadow-2xl">
-            <button onClick={() => setIsCredModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <button onClick={() => setIsCredModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white shrink-0"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-white mb-1">Link Verified Credential</h3>
             {modalError && <div className="p-3 mb-3 bg-red-500/10 text-red-400 text-xs rounded-xl">{modalError}</div>}
             <form onSubmit={handleCommitCredential} className="space-y-3 mt-4">
-              <input type="text" required placeholder="Headline" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-              <textarea rows={2} placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none" />
+              <input type="text" required placeholder="Headline" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500" />
+              <textarea rows={2} placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none outline-none focus:border-emerald-500" />
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" required placeholder="Organization" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-                <input type="text" placeholder="Link" value={newOrgLink} onChange={(e) => setNewOrgLink(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono" />
+                <input type="text" required placeholder="Tagged Entity / Institution (e.g CMRIT)" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500 font-bold placeholder:font-normal" />
+                <input type="text" placeholder="Link" value={newOrgLink} onChange={(e) => setNewOrgLink(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono outline-none focus:border-emerald-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-semibold">
+                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-semibold cursor-pointer outline-none focus:border-emerald-500">
                   <option value="Medal">Medal</option>
                   <option value="Certificate">Certificate</option>
                 </select>
-                <input type="text" required placeholder="Date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                <input type="text" required placeholder="Date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="bg-[#080d10] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-500" />
               </div>
-              <div className="border border-dashed border-slate-800 rounded-xl p-3 bg-[#080d10] relative">
+              <div className="border border-dashed border-slate-800 hover:border-slate-700 transition-all rounded-xl p-3 bg-[#080d10] relative">
                 <input type="file" accept="image/*,application/pdf" onChange={handleFileUpload} disabled={uploadingDoc} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                 <div className="flex items-center justify-between text-xs text-slate-400 pointer-events-none">
-                  <span>{uploadingDoc ? "Transmitting..." : documentPath !== "" ? "Linked" : "Target digital proof asset..."}</span>
+                  <span>{uploadingDoc ? "Transmitting digital proofs..." : documentPath !== "" ? "Digital Asset Cached Live ✓" : "Target digital proof asset..."}</span>
                 </div>
               </div>
-              <button type="submit" disabled={submittingRecord || uploadingDoc} className="w-full py-3.5 bg-emerald-500 text-black font-extrabold text-xs rounded-xl mt-4">Deploy Credential Card</button>
+              <button type="submit" disabled={submittingRecord || uploadingDoc} className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 transition-all text-black font-extrabold text-xs rounded-xl mt-4 shrink-0 cursor-pointer disabled:opacity-50">
+                Submit Institutional Authentication Handshake
+              </button>
             </form>
           </div>
         </div>
